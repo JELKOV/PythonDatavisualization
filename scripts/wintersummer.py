@@ -1,15 +1,13 @@
 import csv
 import matplotlib.pyplot as plt
 import os
+from collections import defaultdict
 
-# 파일 경로 설정
+# 데이터를 저장할 딕셔너리
+seasonal_data = defaultdict(lambda: {"Winter": None, "Summer": None})
+
+# CSV 파일 경로 설정
 file_path = os.path.join(os.path.dirname(__file__), "test.csv")
-
-# 데이터 저장 리스트
-winter_dates = []
-winter_temps = []
-summer_dates = []
-summer_temps = []
 
 # CSV 파일 읽기
 with open(file_path, mode='r') as file:
@@ -18,10 +16,17 @@ with open(file_path, mode='r') as file:
 
     for row in reader:
         if len(row) < 8:  # 데이터가 충분하지 않으면 건너뛰기
-            print("불완전한 데이터:", row)
             continue
-        
-        date = row[2]  # 날짜 (예: "Dec-93" 또는 "Jul-93")
+
+        # 마지막 컬럼에서 날짜 추출
+        try:
+            year_month_day = row[-1]  # 마지막 컬럼에서 날짜 문자열 가져오기
+            year, month = year_month_day.split("-")[:2]  # 연도와 월 추출
+            year = int(year)  # 연도를 정수로 변환
+            month = int(month)  # 월을 정수로 변환
+        except (ValueError, IndexError):
+            continue
+
         min_temp = row[7]  # 최저 기온
         max_temp = row[4]  # 최고 기온
 
@@ -30,27 +35,45 @@ with open(file_path, mode='r') as file:
             min_temp = float(min_temp)
             max_temp = float(max_temp)
         except ValueError:
-            print(f"유효하지 않은 데이터: {row}")
             continue
-        
-        # 겨울 데이터 추출 (12월)
-        if "Dec" in date:
-            winter_dates.append(date)
-            winter_temps.append(min_temp)
-        
-        # 여름 데이터 추출 (7월)
-        elif "Jul" in date:
-            summer_dates.append(date)
-            summer_temps.append(max_temp)
 
-# 두 개의 선 그래프 출력
-plt.figure(figsize=(10, 5))
-plt.plot(winter_dates, winter_temps, label="Winter Min Temp", color='blue', marker='o')
-plt.plot(summer_dates, summer_temps, label="Summer Max Temp", color='red', marker='o')
-plt.title("Winter vs Summer Temperatures", fontsize=15)
-plt.xlabel("Date", fontsize=10)
-plt.ylabel("Temperature (°C)", fontsize=10)
+        # 겨울(12월, 1월, 2월)과 여름(7월, 8월, 9월) 데이터 저장
+        if month in [12, 1, 2]:
+            seasonal_data[year]["Winter"] = min_temp
+        elif month in [7, 8, 9]:
+            seasonal_data[year]["Summer"] = max_temp
+
+# 연도별 데이터를 정렬하여 추출
+years = sorted(seasonal_data.keys())
+
+# 동기화된 데이터 리스트 생성
+filtered_years = []
+filtered_winter_temps = []
+filtered_summer_temps = []
+
+for year in years:
+    if seasonal_data[year]["Winter"] is not None and seasonal_data[year]["Summer"] is not None:
+        filtered_years.append(year)
+        filtered_winter_temps.append(seasonal_data[year]["Winter"])
+        filtered_summer_temps.append(seasonal_data[year]["Summer"])
+
+# 디버깅용 출력
+print("Filtered Years:", filtered_years)
+print("Winter Temps:", filtered_winter_temps)
+print("Summer Temps:", filtered_summer_temps)
+
+# 시각화
+plt.figure(figsize=(12, 6))
+plt.plot(filtered_years, filtered_winter_temps, label="Winter Min Temp", color="blue", marker="o", linestyle="-")
+plt.plot(filtered_years, filtered_summer_temps, label="Summer Max Temp", color="red", marker="o", linestyle="-")
+
+plt.title("Winter (Dec-Feb) vs Summer (Jul-Sep) Temperatures by Year", fontsize=15)
+plt.xlabel("Year", fontsize=12)
+plt.ylabel("Temperature (°C)", fontsize=12)
 plt.legend()
-plt.xticks(rotation=45)
+
+# x축 레이블 설정
+plt.xticks(ticks=filtered_years, labels=[str(year) for year in filtered_years], rotation=45)
 plt.tight_layout()
+plt.grid(True, linestyle="--", alpha=0.5)
 plt.show()
